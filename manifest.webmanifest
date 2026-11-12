@@ -1,0 +1,17 @@
+{
+  "name": "Журнал встреч",
+  "short_name": "Встречи",
+  "description": "Учёт встреч с клиентами. Данные хранятся на телефоне.",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F3F6F7",
+  "theme_color": "#F3F6F7",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

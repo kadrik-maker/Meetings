@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Журнал встреч</title>
+<meta name="description" content="Учёт встреч с клиентами. Данные хранятся на телефоне.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#F3F6F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1519" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Встречи">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column, sticky search header, month-grouped cards, bottom sheets for forms. */
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+[hidden] { display: none !important; }
+:root {
+  --bg: #F3F6F7;
+  --surface: #FFFFFF;
+  --ink: #13202A;
+  --muted: #576873;
+  --line: #DCE3E7;
+  --accent: #0E6F78;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #DDF0F1;
+  --warn: #A8480F;
+  --warn-soft: #FBE8DA;
+  --danger: #B3261E;
+  --scrim: rgba(8, 14, 18, .5);
+  --font-display: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1519; --surface: #162026; --ink: #E6ECEF; --muted: #93A4AE; --line: #26343C;
+    --accent: #4FC3CB; --accent-ink: #06262A; --accent-soft: #12363B;
+    --warn: #F0A06A; --warn-soft: #3A2518; --danger: #FF8A80; --scrim: rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1519; --surface: #162026; --ink: #E6ECEF; --muted: #93A4AE; --line: #26343C;
+  --accent: #4FC3CB; --accent-ink: #06262A; --accent-soft: #12363B;
+  --warn: #F0A06A; --warn-soft: #3A2518; --danger: #FF8A80; --scrim: rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-body); -webkit-text-size-adjust: 100%; }
+body.lock { overflow: hidden; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 10; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button, input, textarea { font: inherit; color: inherit; }
+
+.wrap { max-width: 720px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top .wrap { padding-block: 12px 10px; }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+h1 { margin: 0; font: 600 22px/1.1 var(--font-display); letter-spacing: -.01em; }
+.count { margin-top: 3px; color: var(--muted); font-size: 13px; }
+.search { display: block; width: 100%; margin-top: 10px; min-height: 44px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; -webkit-appearance: none; appearance: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chip { min-height: 34px; padding: 6px 14px; background: transparent; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+/* buttons */
+.btn { min-height: 44px; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line); background: transparent; cursor: pointer; font-weight: 500; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.ghost { color: var(--ink); background: var(--surface); }
+.btn.small { min-height: 38px; padding: 6px 12px; font-size: 14px; }
+
+/* list */
+main { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+.month { margin: 22px 0 8px; font: 600 12px/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.card { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; margin-bottom: 8px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.when { display: flex; flex-direction: column; align-items: center; padding-top: 2px; line-height: 1; }
+.day { font: 600 26px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.mon { margin-top: 5px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 8px; }
+.company { margin: 0; font: 600 16px/1.25 var(--font-display); overflow-wrap: anywhere; }
+.tag { padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; color: var(--muted); }
+.who { margin: 2px 0 0; overflow-wrap: anywhere; }
+.meta { margin: 2px 0 0; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.meta a { color: inherit; }
+.meta a.maplink { color: var(--accent); margin-left: 4px; font-weight: 500; }
+.note { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pill { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px; font-size: 13px; background: var(--accent-soft); color: var(--accent); }
+.pill.due { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 6px -8px -8px; }
+.lb { min-height: 38px; padding: 6px 8px; background: none; border: 0; border-radius: 6px; color: var(--muted); font-size: 14px; cursor: pointer; }
+.lb:hover { color: var(--ink); }
+.lb.danger { color: var(--danger); font-weight: 600; }
+.ask { color: var(--ink); font-size: 14px; padding: 0 8px; }
+
+.empty { max-width: 38ch; padding: 40px 0; }
+.empty h2 { margin: 0 0 8px; font: 600 20px/1.2 var(--font-display); }
+.empty p { margin: 0 0 16px; color: var(--muted); }
+.empty .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.none { padding: 32px 0; color: var(--muted); }
+
+.notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 14px; }
+.notice.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+
+/* floating add button */
+.fab { position: fixed; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 20px 0 16px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 600; box-shadow: 0 6px 20px rgba(0, 0, 0, .22); cursor: pointer; }
+.fab svg { width: 20px; height: 20px; }
+
+/* sheets */
+.overlay { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: var(--scrim); }
+.sheet { width: 100%; max-width: 560px; max-height: calc(100vh - env(safe-area-inset-top, 0px) - 12px); max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 12px); overflow-y: auto; background: var(--surface); border-radius: 16px 16px 0 0; padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+@media (min-width: 600px) {
+  .overlay { align-items: center; }
+  .sheet { border-radius: 16px; padding-bottom: 20px; }
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.sheet-head h2 { margin: 0; font: 600 20px/1.2 var(--font-display); }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; min-width: 0; }
+.field label { font-size: 13px; color: var(--muted); }
+.field input, .field textarea { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; font-size: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.field textarea { resize: vertical; line-height: 1.4; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 12px; }
+.err { min-height: 20px; margin: 0 0 8px; color: var(--danger); font-size: 14px; }
+.form-actions { display: flex; gap: 8px; }
+.form-actions .primary { flex: 1; }
+.hint { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+.stack { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.sep { margin: 16px 0 10px; font: 600 13px var(--font-display); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.status { min-height: 20px; margin: 10px 0 0; font-size: 14px; color: var(--accent); }
+.status.bad { color: var(--danger); }
+input[type="file"] { font-size: 14px; max-width: 100%; }
+
+.toast { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 8px; background: var(--ink); color: var(--bg); font-size: 14px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="bar">
+      <div>
+        <h1>Журнал встреч</h1>
+        <div class="count" id="count"></div>
+      </div>
+      <button class="btn ghost small" id="open-backup" type="button">Копия данных</button>
+    </div>
+    <input class="search" id="q" type="search" placeholder="Поиск: компания, имя, адрес, комментарий" autocomplete="off" aria-label="Поиск по встречам">
+    <div class="chips">
+      <button class="chip" id="chip-all" type="button" aria-pressed="true">Все</button>
+      <button class="chip" id="chip-due" type="button" aria-pressed="false">Связаться</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="notices"></div>
+  <div id="list"></div>
+</main>
+
+<button class="fab" id="fab" type="button">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M10 3v14M3 10h14"/></svg>
+  Встреча
+</button>
+
+<div class="overlay" id="sheet-form" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="form-title">
+    <div class="sheet-head">
+      <h2 id="form-title">Новая встреча</h2>
+      <button class="lb" type="button" data-close>Закрыть</button>
+    </div>
+    <form id="form" novalidate>
+      <div class="field">
+        <label for="f-date">Дата</label>
+        <input id="f-date" type="date">
+      </div>
+      <div class="field">
+        <label for="f-company">Компания</label>
+        <input id="f-company" type="text" list="companies" autocomplete="off" placeholder="Например, ТОО «Алатау Строй»">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="f-name">Имя клиента</label>
+          <input id="f-name" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-position">Должность</label>
+          <input id="f-position" type="text" autocomplete="off">
+        </div>
+      </div>
+      <div class="field">
+        <label for="f-phone">Телефон</label>
+        <input id="f-phone" type="tel" autocomplete="off" placeholder="+7 ...">
+      </div>
+      <div class="field">
+        <label for="f-address">Адрес</label>
+        <input id="f-address" type="text" autocomplete="off" placeholder="Город, улица, дом, офис">
+      </div>
+      <div class="field">
+        <label for="f-comment">Комментарий</label>
+        <textarea id="f-comment" rows="4" placeholder="О чём договорились, что обещали, что важно помнить"></textarea>
+      </div>
+      <div class="field">
+        <label for="f-next">Связаться снова (по желанию)</label>
+        <input id="f-next" type="date">
+      </div>
+      <p class="err" id="f-error" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn primary" type="submit">Сохранить</button>
+        <button class="btn" type="button" data-close>Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay" id="sheet-backup" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="backup-title">
+    <div class="sheet-head">
+      <h2 id="backup-title">Копия данных</h2>
+      <button class="lb" type="button" data-close>Закрыть</button>
+    </div>
+    <p class="hint">Записи хранятся в браузере этого телефона. Если очистить данные сайта или сменить телефон, они пропадут. Раз в неделю копируйте их и сохраняйте в заметки или отправляйте себе в Telegram.</p>
+    <div class="stack">
+      <button class="btn primary small" type="button" id="b-copy-json">Скопировать копию</button>
+      <button class="btn small" type="button" id="b-copy-tsv">Скопировать как таблицу</button>
+    </div>
+    <p class="hint">Таблицу можно вставить в Excel или Google Таблицы.</p>
+    <div class="sep">Восстановить</div>
+    <div class="field">
+      <label for="b-text">Вставьте сюда ранее скопированный текст</label>
+      <textarea id="b-text" rows="4" spellcheck="false"></textarea>
+    </div>
+    <div class="stack">
+      <button class="btn small" type="button" id="b-import">Восстановить из текста</button>
+    </div>
+    <div class="field">
+      <label for="b-file">Или выберите файл копии</label>
+      <input id="b-file" type="file" accept=".json,.txt,application/json,text/plain">
+    </div>
+    <p class="hint">Восстановление добавляет недостающие записи и ничего не удаляет.</p>
+    <p class="status" id="b-status" role="status"></p>
+  </div>
+</div>
+
+<datalist id="companies"></datalist>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'journal-vstrech.v1';
+  var $ = function (id) { return document.getElementById(id); };
+  var items = [], storageOK = true, filter = 'all', query = '';
+  var editingId = null, confirmId = null, lastFocus = null, toastT = 0;
+  var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+  /* ---------- storage ---------- */
+  function probe() {
+    try { localStorage.setItem('__probe', '1'); localStorage.removeItem('__probe'); return true; }
+    catch (e) { return false; }
+  }
+  function valid(m) {
+    return m && typeof m.id === 'string' && typeof m.company === 'string' && DATE_RE.test(m.date || '');
+  }
+  function load() {
+    storageOK = probe();
+    if (!storageOK) return;
+    try {
+      var raw = localStorage.getItem(KEY);
+      var a = raw ? JSON.parse(raw) : [];
+      items = Array.isArray(a) ? a.filter(valid) : [];
+    } catch (e) { items = []; }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(items)); storageOK = true; }
+    catch (e) { storageOK = false; }
+  }
+
+  /* ---------- helpers ---------- */
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function str(v) { return typeof v === 'string' ? v.trim() : ''; }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function toStr(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function today() { return toStr(new Date()); }
+  function parse(s) { var p = s.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+  function addDays(s, n) { var d = parse(s); d.setDate(d.getDate() + n); return toStr(d); }
+  function monShort(d) { return d.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', ''); }
+  function shortDate(s) { var d = parse(s); return d.getDate() + ' ' + monShort(d); }
+  function ruDate(s) { return s ? s.split('-').reverse().join('.') : ''; }
+  function monthLabel(s) {
+    var t = parse(s).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).replace(/\s*г\.?$/, '');
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function plural(n, a, b, c) {
+    var m = n % 100, k = n % 10;
+    if (m > 10 && m < 20) return c;
+    if (k === 1) return a;
+    if (k > 1 && k < 5) return b;
+    return c;
+  }
+  function find(id) { return items.filter(function (m) { return m.id === id; })[0]; }
+
+  /* ---------- list ---------- */
+  function visible() {
+    var t = today(), q = query.trim().toLowerCase();
+    return items.filter(function (m) {
+      if (filter === 'due' && !(m.next && m.next <= t)) return false;
+      if (!q) return true;
+      return [m.company, m.name, m.position, m.phone, m.address, m.comment].join(' ').toLowerCase().indexOf(q) !== -1;
+    }).sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return (b.created || 0) - (a.created || 0);
+    });
+  }
+
+  function card(m, t) {
+    var c = el('article', 'card');
+    c.dataset.id = m.id;
+    var d = parse(m.date);
+    var when = el('div', 'when');
+    when.append(el('span', 'day', String(d.getDate())), el('span', 'mon', monShort(d)));
+
+    var body = el('div');
+    var head = el('div', 'head');
+    head.append(el('h3', 'company', m.company));
+    if (m.demo) head.append(el('span', 'tag', 'пример'));
+    body.append(head);
+
+    var who = [m.name, m.position].filter(Boolean).join(' · ');
+    if (who) body.append(el('p', 'who', who));
+
+    if (m.phone) {
+      var pp = el('p', 'meta');
+      var pa = el('a', null, m.phone);
+      pa.href = 'tel:' + m.phone.replace(/[^\d+]/g, '');
+      pp.append(pa);
+      body.append(pp);
+    }
+    if (m.address) {
+      var ap = el('p', 'meta');
+      ap.append(document.createTextNode(m.address));
+      var ma = el('a', 'maplink', '2ГИС');
+      ma.href = 'https://2gis.kz/search/' + encodeURIComponent(m.address);
+      ma.target = '_blank';
+      ma.rel = 'noopener';
+      ap.append(ma);
+      body.append(ap);
+    }
+    if (m.comment) body.append(el('p', 'note', m.comment));
+
+    if (m.next) {
+      var late = m.next < t, now = m.next === t;
+      var label = 'Связаться: ' + (now ? 'сегодня' : shortDate(m.next)) + (late ? ' · просрочено' : '');
+      body.append(el('span', 'pill' + (late || now ? ' due' : ''), label));
+    }
+
+    var act = el('div', 'actions');
+    if (confirmId === m.id) {
+      act.append(el('span', 'ask', 'Удалить встречу?'));
+      var yes = el('button', 'lb danger', 'Да, удалить'); yes.type = 'button'; yes.dataset.act = 'del';
+      var no = el('button', 'lb', 'Отмена'); no.type = 'button'; no.dataset.act = 'cancel';
+      act.append(yes, no);
+    } else {
+      var ed = el('button', 'lb', 'Изменить'); ed.type = 'button'; ed.dataset.act = 'edit';
+      act.append(ed);
+      if (m.next) {
+        var dn = el('button', 'lb', 'Связался'); dn.type = 'button'; dn.dataset.act = 'done';
+        act.append(dn);
+      }
+      var dl = el('button', 'lb', 'Удалить'); dl.type = 'button'; dl.dataset.act = 'ask';
+      act.append(dl);
+    }
+    body.append(act);
+    c.append(when, body);
+    return c;
+  }
+
+  function render() {
+    var t = today();
+    $('count').textContent = items.length
+      ? items.length + ' ' + plural(items.length, 'встреча', 'встречи', 'встреч')
+      : 'Пока пусто';
+    var dueN = items.filter(function (m) { return m.next && m.next <= t; }).length;
+    $('chip-due').textContent = 'Связаться' + (dueN ? ' · ' + dueN : '');
+    $('chip-all').setAttribute('aria-pressed', filter === 'all');
+    $('chip-due').setAttribute('aria-pressed', filter === 'due');
+
+    var notes = $('notices');
+    notes.replaceChildren();
+    if (!storageOK) {
+      notes.append(el('div', 'notice warn', 'Браузер не разрешает сохранять данные. Записи пропадут после закрытия страницы. Откройте страницу в обычной вкладке, не в приватном режиме.'));
+    }
+    if (items.some(function (m) { return m.demo; })) {
+      var n = el('div', 'notice');
+      n.append(el('span', null, 'Показаны примеры.'));
+      var rm = el('button', 'btn small', 'Убрать примеры');
+      rm.type = 'button'; rm.id = 'rm-demo';
+      n.append(rm);
+      notes.append(n);
+    }
+
+    var seen = {}, dl = $('companies');
+    dl.replaceChildren();
+    items.forEach(function (m) {
+      if (!seen[m.company]) { seen[m.company] = 1; var o = document.createElement('option'); o.value = m.company; dl.append(o); }
+    });
+
+    var box = $('list');
+    box.replaceChildren();
+    if (!items.length) {
+      var e = el('div', 'empty');
+      e.append(el('h2', null, 'Пока нет встреч'));
+      e.append(el('p', null, 'Записывайте дату, компанию, с кем говорили, адрес и комментарий. Всё остаётся на этом телефоне.'));
+      var row = el('div', 'row');
+      var b1 = el('button', 'btn primary', 'Добавить встречу'); b1.type = 'button'; b1.dataset.act = 'new';
+      var b2 = el('button', 'btn', 'Показать примеры'); b2.type = 'button'; b2.dataset.act = 'demo';
+      row.append(b1, b2);
+      e.append(row);
+      box.append(e);
+      return;
+    }
+    var vis = visible();
+    if (!vis.length) {
+      box.append(el('p', 'none', filter === 'due' && !query ? 'Нет встреч, по которым нужно связаться.' : 'Ничего не найдено.'));
+      return;
+    }
+    var cur = '';
+    vis.forEach(function (m) {
+      var k = m.date.slice(0, 7);
+      if (k !== cur) { cur = k; box.append(el('h2', 'month', monthLabel(m.date))); }
+      box.append(card(m, t));
+    });
+  }
+
+  /* ---------- sheets ---------- */
+  function openSheet(id) {
+    lastFocus = document.activeElement;
+    $(id).hidden = false;
+    document.body.classList.add('lock');
+  }
+  function closeSheets() {
+    document.querySelectorAll('.overlay').forEach(function (o) { o.hidden = true; });
+    document.body.classList.remove('lock');
+    if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) {} }
+  }
+  function anyOpen() {
+    return Array.prototype.some.call(document.querySelectorAll('.overlay'), function (o) { return !o.hidden; });
+  }
+
+  function openForm(id) {
+    editingId = id || null;
+    var m = id ? find(id) : null;
+    $('form-title').textContent = m ? 'Изменить встречу' : 'Новая встреча';
+    $('f-date').value = m ? m.date : today();
+    $('f-company').value = m ? m.company : '';
+    $('f-name').value = m ? m.name || '' : '';
+    $('f-position').value = m ? m.position || '' : '';
+    $('f-phone').value = m ? m.phone || '' : '';
+    $('f-address').value = m ? m.address || '' : '';
+    $('f-comment').value = m ? m.comment || '' : '';
+    $('f-next').value = m ? m.next || '' : '';
+    $('f-error').textContent = '';
+    openSheet('sheet-form');
+    if (!m) setTimeout(function () { $('f-company').focus(); }, 0);
+  }
+
+  $('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var v = function (k) { return $('f-' + k).value.trim(); };
+    var rec = {
+      date: v('date'), company: v('company'), name: v('name'), position: v('position'),
+      phone: v('phone'), address: v('address'), comment: v('comment'), next: v('next')
+    };
+    if (!rec.company) { $('f-error').textContent = 'Укажите название компании.'; $('f-company').focus(); return; }
+    if (!rec.date) { $('f-error').textContent = 'Укажите дату встречи.'; $('f-date').focus(); return; }
+    if (editingId && find(editingId)) {
+      Object.assign(find(editingId), rec, { demo: false });
+    } else {
+      items.push(Object.assign({ id: uid(), created: Date.now() }, rec));
+    }
+    save();
+    closeSheets();
+    render();
+    toast(storageOK ? 'Сохранено' : 'Не удалось сохранить в браузере');
+  });
+
+  /* ---------- examples ---------- */
+  function addDemo() {
+    var t = today(), base = Date.now();
+    var rows = [
+      { date: t, company: 'ТОО «Алатау Строй»', name: 'Серик Нурланов', position: 'Директор по закупкам', phone: '+7 701 555 01 23', address: 'Алматы, пр. Аль-Фараби, 77/7', comment: 'Просил коммерческое предложение до пятницы. Интересует поставка от 500 м².', next: addDays(t, 3) },
+      { date: addDays(t, -4), company: 'ИП Каримова', name: 'Айгуль Каримова', position: 'Владелец', phone: '', address: 'Астана, ул. Кенесары, 40', comment: 'Встретились в кафе. Договорились созвониться после праздников.', next: addDays(t, -1) },
+      { date: addDays(t, -34), company: 'ТОО «Талгар Агро»', name: 'Ерлан Бекмуратов', position: 'Коммерческий директор', phone: '', address: 'Талгар, ул. Тауелсиздик, 12', comment: 'Показали образцы. Решение будет после совета директоров.', next: '' }
+    ];
+    rows.forEach(function (r, i) { items.push(Object.assign({ id: uid(), created: base - i, demo: true }, r)); });
+    save(); render();
+  }
+  function removeDemo() {
+    items = items.filter(function (m) { return !m.demo; });
+    save(); render();
+  }
+
+  /* ---------- backup ---------- */
+  function status(msg, bad) {
+    var s = $('b-status');
+    s.textContent = msg;
+    s.className = 'status' + (bad ? ' bad' : '');
+  }
+  function real() { return items.filter(function (m) { return !m.demo; }); }
+  function jsonText() {
+    var list = real().map(function (m) {
+      return { id: m.id, created: m.created || 0, date: m.date, company: m.company, name: m.name || '', position: m.position || '', phone: m.phone || '', address: m.address || '', comment: m.comment || '', next: m.next || '' };
+    });
+    return JSON.stringify({ app: 'journal-vstrech', version: 1, meetings: list }, null, 1);
+  }
+  function tsvText() {
+    var rows = [['Дата', 'Компания', 'Имя', 'Должность', 'Телефон', 'Адрес', 'Комментарий', 'Связаться снова']];
+    real().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; }).forEach(function (m) {
+      rows.push([ruDate(m.date), m.company, m.name, m.position, m.phone, m.address, m.comment, ruDate(m.next)]);
+    });
+    return rows.map(function (r) {
+      return r.map(function (c) { return String(c || '').replace(/[\t\r\n]+/g, ' '); }).join('\t');
+    }).join('\n');
+  }
+  function copyText(text, okMsg) {
+    if (!real().length) { status('Пока нечего копировать.', true); return; }
+    var fallback = function () {
+      var ta = $('b-text');
+      ta.value = text; ta.focus(); ta.select();
+      status('Автоматическое копирование недоступно. Текст выделен в поле ниже, скопируйте его вручную.', true);
+    };
+    try {
+      navigator.clipboard.writeText(text).then(function () { status(okMsg); }, fallback);
+    } catch (e) { fallback(); }
+  }
+  function importText(text) {
+    var data;
+    try { data = JSON.parse(text); }
+    catch (e) { status('Не удалось прочитать текст. Вставьте копию целиком, как она была скопирована.', true); return; }
+    var arr = Array.isArray(data) ? data : (data && Array.isArray(data.meetings) ? data.meetings : null);
+    if (!arr) { status('В тексте нет списка встреч.', true); return; }
+    var have = {}, added = 0, skipped = 0;
+    items.forEach(function (m) { have[m.id] = 1; });
+    arr.forEach(function (r) {
+      if (!r || typeof r.company !== 'string' || !DATE_RE.test(r.date || '')) { skipped++; return; }
+      var id = typeof r.id === 'string' && r.id ? r.id : uid();
+      if (have[id]) { skipped++; return; }
+      have[id] = 1;
+      items.push({
+        id: id, created: Number(r.created) || 0, date: r.date, company: r.company.trim(),
+        name: str(r.name), position: str(r.position), phone: str(r.phone), address: str(r.address),
+        comment: str(r.comment), next: DATE_RE.test(r.next || '') ? r.next : ''
+      });
+      added++;
+    });
+    save(); render();
+    status('Добавлено: ' + added + '. Пропущено (уже есть или нет даты и компании): ' + skipped + '.');
+  }
+
+  /* ---------- toast ---------- */
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { t.hidden = true; }, 2200);
+  }
+
+  /* ---------- events ---------- */
+  $('fab').addEventListener('click', function () { openForm(); });
+  $('open-backup').addEventListener('click', function () { status(''); $('b-text').value = ''; openSheet('sheet-backup'); });
+  $('q').addEventListener('input', function (e) { query = e.target.value; render(); });
+  $('chip-all').addEventListener('click', function () { filter = 'all'; render(); });
+  $('chip-due').addEventListener('click', function () { filter = 'due'; render(); });
+  $('notices').addEventListener('click', function (e) { if (e.target.id === 'rm-demo') removeDemo(); });
+
+  $('list').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]');
+    if (!b) return;
+    var act = b.dataset.act, c = b.closest('.card'), id = c && c.dataset.id;
+    if (act === 'new') return openForm();
+    if (act === 'demo') return addDemo();
+    if (act === 'edit') return openForm(id);
+    if (act === 'ask') { confirmId = id; render(); return; }
+    if (act === 'cancel') { confirmId = null; render(); return; }
+    if (act === 'del') {
+      items = items.filter(function (m) { return m.id !== id; });
+      confirmId = null; save(); render(); toast('Встреча удалена'); return;
+    }
+    if (act === 'done') {
+      var m = find(id);
+      if (m) { m.next = ''; save(); render(); toast('Отмечено: связались'); }
+    }
+  });
+
+  document.querySelectorAll('.overlay').forEach(function (o) {
+    o.addEventListener('click', function (e) { if (e.target === o) closeSheets(); });
+  });
+  document.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', closeSheets); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && anyOpen()) closeSheets(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) render(); });
+
+  $('b-copy-json').addEventListener('click', function () { copyText(jsonText(), 'Копия скопирована. Вставьте её в заметки или отправьте себе в Telegram.'); });
+  $('b-copy-tsv').addEventListener('click', function () { copyText(tsvText(), 'Таблица скопирована. Вставьте её в Excel или Google Таблицы.'); });
+  $('b-import').addEventListener('click', function () {
+    var txt = $('b-text').value.trim();
+    if (!txt) { status('Сначала вставьте текст копии в поле выше.', true); return; }
+    importText(txt);
+  });
+  $('b-file').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () { importText(String(r.result || '')); e.target.value = ''; };
+    r.onerror = function () { status('Не удалось прочитать файл.', true); };
+    r.readAsText(f);
+  });
+
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
